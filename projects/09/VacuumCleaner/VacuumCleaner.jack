@@ -1,0 +1,90 @@
+class VacuumCleaner{
+    field Array head;
+    field int size;
+    field int i;
+    field Array lastCell;
+
+     constructor VacuumCleaner new(){
+        let size = 12;
+
+        // Define all the vacuum
+        let head = Array.new(2);
+
+        let head[0] = 40;
+        let head[1] = 40;
+
+        do drawVacuum();
+        return this; 
+    }
+
+    method Array getHead() {return head;}
+
+    /** Move all the VacuumCleaner right */
+    method boolean moveRight(){
+        if ((head[0] + (2*size)) < 512) {
+            do erase();
+            do Screen.setColor(true);
+            do Screen.drawRectangle(head[0]+size, head[1], head[0]+(2*size), head[1]+size);
+            let head[0] = head[0] + size;
+            return true;
+        }
+        return false;
+    }
+
+    /** Move all the VacuumCleaner left */
+    method boolean moveLeft(){
+        if ((head[0] - size) > 1) {
+            do erase();
+            do Screen.setColor(true);
+            do Screen.drawRectangle(head[0]-size, head[1], head[0], head[1]+size);
+            let head[0] = head[0] - size;
+            return true;
+        }
+        return false;
+    }
+
+    /** Move all the VacuumCleaner down */
+    method boolean moveDown(){
+        if ((head[1] + (2*size)) < 256) {
+            do erase();
+            do Screen.setColor(true);
+            do Screen.drawRectangle(head[0], head[1]+size, head[0]+size, head[1]+(2*size));
+            let head[1] = head[1] + size;
+            return true;
+        }
+        return false;
+    }
+
+     /** Move all the VacuumCleaner up */
+    method boolean moveUp(){
+        if ((head[1] - size) > 1) {
+            do erase();
+            do Screen.setColor(true);
+            do Screen.drawRectangle(head[0], head[1]-size, head[0]+size, head[1]);
+            let head[1] = head[1] - size;
+            return true;
+        }
+        return false;
+    }
+
+    method void erase() {
+        do Screen.setColor(false);
+        do Screen.drawRectangle(head[0], head[1], head[0]+size, head[1]+size);
+
+        return;
+    }
+
+
+    method void drawVacuum() {
+        do Screen.setColor(true);
+        do Screen.drawRectangle(head[0], head[1], head[0]+size, head[1]+size);
+        
+        return ;
+    }
+
+    method void dispose() {
+        do Memory.deAlloc(this);
+        return;
+    }
+    
+}

@@ -1,0 +1,98 @@
+class VacuumCleanerGame {
+
+    field VacuumCleaner vacuumCleaner;
+    field char direction;
+    
+    constructor VacuumCleanerGame new(){
+        let vacuumCleaner = VacuumCleaner.new();
+        return this;
+    }
+
+    method boolean moveVacuumCleaner() {
+        var boolean ifValid;
+        let ifValid = true;
+        if (direction = 131) { let ifValid = vacuumCleaner.moveUp(); }
+        if (direction = 133) { let ifValid =  vacuumCleaner.moveDown(); }
+        if (direction = 130) { let ifValid =  vacuumCleaner.moveLeft(); }
+        if (direction = 132) { let ifValid =  vacuumCleaner.moveRight(); }
+        
+        do Sys.wait(50);  // delays the next movement
+
+        return ifValid;
+   }
+
+    method void run(){
+        var char key;
+        var boolean exit;
+        var boolean start;
+
+        let start = false;
+        let exit = false;
+
+        do writeWelcome();
+        while (~start) {
+            let key = Keyboard.keyPressed();
+            if (key = 32)  { let start = true; } // space key
+        }
+
+        do Screen.clearScreen();
+
+        do Screen.setColor(true);
+        // do Screen.drawRectangle(0, 0, 511, 255); // Full screen
+        do Screen.drawRectangle(12, 12, 499, 243);
+
+
+        while (~exit) {
+            while (key = 0 & ~(exit)) {
+            let key = Keyboard.keyPressed();
+            let exit = (~moveVacuumCleaner());
+            }
+
+            if (key = 81)  { let exit = true; } // q key
+
+            // Modify the direction according the key pressed
+            if ((key > 129) & (key < 134)) {let direction = key; } 
+
+            while (~(key = 0) & ~(exit)) {
+
+            let key = Keyboard.keyPressed();
+            let exit = (~moveVacuumCleaner());
+            }
+
+        }
+        return ;
+    }
+    
+
+    method void writeWelcome() {
+      do Output.printString("Hello There!");
+      do Output.println();      // New line
+      do Output.printString("We believe in just having fun, without any purpose!");
+      do Output.println();      // New line
+      do Output.printString("So we made a game Just for you ;)");
+      do Output.println();      // New line
+      do Output.printString("Our rug got really dirty and we need you to clean it.");
+      do Output.println();      // New line
+      do Output.printString("We provide you a vacuum machine, use it carefully");
+      do Output.println();      // New line
+      do Output.printString("Without stepping out the rug.");
+      do Output.println();      // New line
+      do Output.printString("That's because we are students and can't afford it.. :(");
+      do Output.println();      // New line
+      do Output.println();      // New line
+      do Output.printString("In oreder to start- press the space button");
+      do Output.println();      // New line
+      do Output.printString("In oreder to exit- press the 'q' button");
+      do Output.println();      // New line
+      do Output.println();      // New line
+      do Output.printString("That's it! have fun, and good luck!");
+      do Output.println();      // New line
+      return;
+   }
+
+    method void dispose() {
+        do vacuumCleaner.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+}
