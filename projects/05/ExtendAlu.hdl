@@ -1,0 +1,46 @@
+// This file is part of nand2tetris, as taught in The Hebrew University,
+// and was written by Aviv Yaish, and is published under the Creative 
+// Common Attribution-NonCommercial-ShareAlike 3.0 Unported License 
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+// The inputs of the extended ALU are instruction[9], x[16], y[16].
+// The output is defined as follows:
+// If instruction[7..8] == 1, 1, the output is the same as the regular ALU,
+// where instruction[5]=zx, instruction[4]=nx, ..., instruction[0]=no.
+// If instruction[8] == 0, the output will be a shift of the input:
+// - If instruction[4] == 0, the input "y" will be shifted, otherwise "x", 
+// - If instruction[5] == 0, the shift will be a right-shift, otherwise left.
+
+CHIP ExtendAlu {
+     IN x[16], y[16], instruction[9];
+     OUT out[16], zr, ng;
+
+
+     PARTS:
+     //Shift values
+     ShiftLeft(in=x, out=xShiftLeft);
+     ShiftRight(in=x, out=xShiftRight);
+     ShiftLeft(in=y, out=yShiftLeft);
+     ShiftRight(in=y, out=yShiftRight);
+
+     //Choose which shift to do
+     Mux16(a=xShiftRight, b=xShiftLeft, sel=instruction[5], out=shiftedX);
+     Mux16(a=yShiftRight, b=yShiftLeft, sel=instruction[5], out=shiftedY);
+
+     //Choose which one to shift
+     Mux16(a=shiftedY, b=shiftedX, sel=instruction[4], out=final);
+
+     //Compute shift values
+     ALU(x=final, y=false, zx=false, nx=false, zy=false, ny=false, f=true,
+     no=false, out=shiftOUT, zr=shiftZR, ng=shiftNG);
+
+     //Compute ALU values
+     ALU(x=x, y=y, zx=instruction[5], nx=instruction[4],
+     zy=instruction[3], ny=instruction[2], f=instruction[1],
+     no=instruction[0], out=regOUT, zr=regZR, ng=regNG);
+
+     //Choose between shift values to ALU values
+     Mux16(a=shiftOUT, b=regOUT, sel=instruction[8], out=out);
+     Mux(a=shiftZR, b=regZR, sel=instruction[8], out=zr);
+     Mux(a=shiftNG, b=regNG, sel=instruction[8], out=ng);
+}

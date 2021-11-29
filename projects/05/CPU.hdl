@@ -1,0 +1,131 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/05/CPU.hdl
+
+/**
+ * The Hack CPU (Central Processing unit), consisting of an ALU,
+ * two registers named A and D, and a program counter named PC.
+ * The CPU is designed to fetch and execute instructions written in 
+ * the Hack machine language. In particular, functions as follows:
+ * Executes the inputted instruction according to the Hack machine 
+ * language specification. The D and A in the language specification
+ * refer to CPU-resident registers, while M refers to the external
+ * memory location addressed by A, i.e. to Memory[A]. The inM input 
+ * holds the value of this location. If the current instruction needs 
+ * to write a value to M, the value is placed in outM, the address 
+ * of the target location is placed in the addressM output, and the 
+ * writeM control bit is asserted. (When writeM==0, any value may 
+ * appear in outM). The outM and writeM outputs are combinational: 
+ * they are affected instantaneously by the execution of the current 
+ * instruction. The addressM and pc outputs are clocked: although they 
+ * are affected by the execution of the current instruction, they commit 
+ * to their new values only in the next time step. If reset==1 then the 
+ * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather 
+ * than to the address resulting from executing the current instruction. 
+ */
+
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // Choose between A-instruction to C-instruction
+    And(a=true, b=instruction[15], out=isC);
+    Not(in=isC, out=isA);
+
+    // opCode choosing if ARegister gets instruction or ALU output
+    Mux16(a=instruction, b=outALU, sel=isC, out=GoingToARegister);
+    Or(a=isA, b=instruction[5], out=toLoadARegister);
+
+    // Initialize ARegister
+    ARegister(in=GoingToARegister, load=toLoadARegister, out=outARegister,
+    out[0..14]=addressM);
+
+    // Define how to choose between inM or ARegister (sel)
+    And(a=instruction[12], b=instruction[15], out=AResgisterOrInM);
+
+    // Define inputs to ALU
+    Mux(a=true, b=instruction[11], sel=isC, out=zx);
+    Mux(a=false, b=instruction[10], sel=isC, out=nx);
+    Mux(a=false, b=instruction[9], sel=isC, out=zy);
+    Mux(a=false, b=instruction[8], sel=isC, out=ny);
+    Mux(a=true, b=instruction[7], sel=isC, out=f);
+    Mux(a=false, b=instruction[6], sel=isC, out=no);
+
+    // Choose y-input ALU between ARegister or inM
+    Mux16(a=outARegister, b=inM, sel=AResgisterOrInM, out=ARegisterMuxInM);
+
+    // Check if need to load DRegister
+    And(a=isC, b=instruction[4], out=toLoadDRegister);
+
+    // Define DRegister
+    DRegister(in=outALU, load=toLoadDRegister, out=outDRegister);
+
+    // Send to ALU
+    ALU(x=outDRegister, y=ARegisterMuxInM, zx=zx, nx=nx, zy=zy,
+    ny=ny, f=f, no=no, out=outALU, zr=zr, ng=ng, out=outM);
+
+    // Define writeM
+    And(a=instruction[3], b=isC, out=writeM);
+
+    // Calculate if need to jump:
+    // Define helpful internal pins
+    Not(in=zr,out=notZR);
+    Not(in=ng,out=notNG);
+
+    And(a=instruction[0], b=isC, out=j3);
+    And(a=instruction[1], b=isC, out=j2);
+    And(a=instruction[2], b=isC, out=j1);
+
+    And(a=j1, b=j2, out=j1ANDj2);
+    And(a=j1, b=j3, out=j1ANDj3);
+    And(a=j2, b=j3, out=j2ANDj3);
+
+    Or(a=j1, b=j2, out=j1ORj2);
+    Or(a=j1, b=j3, out=j1ORj3);
+    Or(a=j2, b=j3, out=j2ORj3);
+
+    Not(in=j1ORj2, out=NOTj1NOTj2);
+    Not(in=j1ORj3, out=NOTj1NOTj3);
+    Not(in=j2ORj3, out=NOTj2NOTj3);
+
+    And(a=j1, b=NOTj2NOTj3, out=j1NOTj2NOTj3);
+    And(a=j2, b=NOTj1NOTj3, out=j2NOTj1NOTj3);
+    And(a=j3, b=NOTj1NOTj2, out=j3NOTj1NOTj2);
+
+    And(a=zr, b=notNG, out=zrNOTng);
+    And(a=notZR, b=ng, out=ngNOTzr);
+    And(a=notZR, b=notNG, out=NOTzrNOTng);
+    Or(a=zr, b=ng, out=zrORng);
+
+    // 3-conditional jump
+    And(a=j1ANDj2, b=j3, out=jmp7);
+
+    // 2-conditional jump
+    And(a=j2ANDj3, b=notNG, out=jmp3);
+    And(a=j1ANDj3, b=notZR, out=jmp5);
+    And(a=j1ANDj2, b=zrORng, out=jmp6);
+
+    // 1-conditional jump
+    And(a=j3NOTj1NOTj2, b=NOTzrNOTng, out=jmp1);
+    And(a=j2NOTj1NOTj3, b=zrNOTng, out=jmp2);
+    And(a=j1NOTj2NOTj3, b=ngNOTzr, out=jmp4);
+
+    // Define if there is some truth condition
+    Or8Way(in[0]=jmp1, in[1]=jmp2, in[2]=jmp3, in[3]=jmp4, in[4]=jmp5,
+    in[5]=jmp6, in[6]=jmp7, in[7]=false, out=loadPC);
+
+
+    //Define PC
+    PC(in=outARegister, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+}

@@ -1,0 +1,121 @@
+// This file is part of nand2tetris, as taught in The Hebrew University,
+// and was written by Aviv Yaish, and is published under the Creative 
+// Common Attribution-NonCommercial-ShareAlike 3.0 Unported License 
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+// This chip is an extension of the regular CPU that uses the extended ALU.
+// If instruction[15]==0 or (instruction[14] and instruction[13] equals 1)
+// the CpuMul behave exactly as the same as the regular CPU.
+// If the instruction is a c-instruction and instruction[14] == 0, the chip will 
+// behave as follows:
+//  Instruction  | 12 | 11 | 10 |
+// ______________________________
+// dest=D<<;jump | 0  | 1  | 1  |
+// dest=A<<;jump | 0  | 1  | 0  |
+// dest=M<<;jump | 1  | 1  | 0  |
+// dest=D>>;jump | 0  | 0  | 1  |
+// dest=A>>;jump | 0  | 0  | 0  |
+// dest=M>>;jump | 1  | 0  | 0  |
+
+CHIP CpuMul {
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset=1) or continue executing
+                         // the current program (reset=0).
+    OUT outM[16],        // M value output
+        writeM,          // Write into M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+    
+    PARTS:
+    // Choose between A-instruction to C-instruction
+    And(a=true, b=instruction[15], out=isC);
+    Not(in=isC, out=isA);
+
+    // opCode choosing if ARegister gets instruction or ALU output
+    Mux16(a=instruction, b=outALU, sel=isC, out=GoingToARegister);
+    Or(a=isA, b=instruction[5], out=toLoadARegister);
+
+    // Initialize ARegister
+    ARegister(in=GoingToARegister, load=toLoadARegister, out=outARegister,
+    out[0..14]=addressM);
+
+    // Define how to choose between inM or ARegister (sel)
+    And(a=instruction[12], b=instruction[15], out=AResgisterOrInM);
+
+    // Define inputs to ALU
+    Mux(a=true, b=instruction[11], sel=isC, out=zx);
+    Mux(a=false, b=instruction[10], sel=isC, out=nx);
+    Mux(a=false, b=instruction[9], sel=isC, out=zy);
+    Mux(a=false, b=instruction[8], sel=isC, out=ny);
+    Mux(a=true, b=instruction[7], sel=isC, out=f);
+    Mux(a=false, b=instruction[6], sel=isC, out=no);
+
+    // Choose y-input ALU between ARegister or inM
+    Mux16(a=outARegister, b=inM, sel=AResgisterOrInM, out=ARegisterMuxInM);
+
+    // Check if need to load DRegister
+    And(a=isC, b=instruction[4], out=toLoadDRegister);
+
+    // Define DRegister
+    DRegister(in=outALU, load=toLoadDRegister, out=outDRegister);
+
+    // Send to ALU
+    ExtendAlu(x=outDRegister, y=ARegisterMuxInM, instruction=
+    instruction[6..14], out=outALU, zr=zr, ng=ng, out=outM);
+
+    // Define writeM
+    And(a=instruction[3], b=isC, out=writeM);
+
+    // Calculate if need to jump:
+    // Define helpful internal pins
+    Not(in=zr,out=notZR);
+    Not(in=ng,out=notNG);
+
+    And(a=instruction[0], b=isC, out=j3);
+    And(a=instruction[1], b=isC, out=j2);
+    And(a=instruction[2], b=isC, out=j1);
+
+    And(a=j1, b=j2, out=j1ANDj2);
+    And(a=j1, b=j3, out=j1ANDj3);
+    And(a=j2, b=j3, out=j2ANDj3);
+
+    Or(a=j1, b=j2, out=j1ORj2);
+    Or(a=j1, b=j3, out=j1ORj3);
+    Or(a=j2, b=j3, out=j2ORj3);
+
+    Not(in=j1ORj2, out=NOTj1NOTj2);
+    Not(in=j1ORj3, out=NOTj1NOTj3);
+    Not(in=j2ORj3, out=NOTj2NOTj3);
+
+    And(a=j1, b=NOTj2NOTj3, out=j1NOTj2NOTj3);
+    And(a=j2, b=NOTj1NOTj3, out=j2NOTj1NOTj3);
+    And(a=j3, b=NOTj1NOTj2, out=j3NOTj1NOTj2);
+
+    And(a=zr, b=notNG, out=zrNOTng);
+    And(a=notZR, b=ng, out=ngNOTzr);
+    And(a=notZR, b=notNG, out=NOTzrNOTng);
+    Or(a=zr, b=ng, out=zrORng);
+
+    // 3-conditional jump
+    And(a=j1ANDj2, b=j3, out=jmp7);
+
+    // 2-conditional jump
+    And(a=j2ANDj3, b=notNG, out=jmp3);
+    And(a=j1ANDj3, b=notZR, out=jmp5);
+    And(a=j1ANDj2, b=zrORng, out=jmp6);
+
+    // 1-conditional jump
+    And(a=j3NOTj1NOTj2, b=NOTzrNOTng, out=jmp1);
+    And(a=j2NOTj1NOTj3, b=zrNOTng, out=jmp2);
+    And(a=j1NOTj2NOTj3, b=ngNOTzr, out=jmp4);
+
+    // Define if there is some truth condition
+    Or8Way(in[0]=jmp1, in[1]=jmp2, in[2]=jmp3, in[3]=jmp4, in[4]=jmp5,
+    in[5]=jmp6, in[6]=jmp7, in[7]=false, out=loadPC);
+
+
+    //Define PC
+    PC(in=outARegister, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+}
