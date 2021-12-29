@@ -132,6 +132,11 @@ class JackTokenizer:
             return "&amp;"
         elif curr_token == '"':
             return "&quot;"
+        elif curr_token == '^':
+            return "<<"
+        elif curr_token == '#':
+            return ">>"
+
         return curr_token
 
     def identifier(self) -> str:

@@ -1,0 +1,230 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Screen.jack
+
+/**
+ * A library of functions for displaying graphics on the screen.
+ * The Hack physical screen consists of 256 rows (indexed 0..255, top to bottom)
+ * of 512 pixels each (indexed 0..511, left to right). The top left pixel on 
+ * the screen is indexed (0,0).
+ */
+class Screen {
+    static int screenBase, screenRAMSize, yMax, xMax;
+    static boolean color;
+    static Array multiply32, divide16, powersOf2, lowSeqPowersOf2;
+
+    /** Initializes the Screen. */
+    function void init() {
+        var int i, z, currMultiply, currDivide;
+        let screenBase = 16384;
+        let screenRAMSize = 8160;
+        let yMax = 256;
+        let xMax = 512;
+        let color = true;
+        
+        // Array of multiplies of 32
+        let multiply32 = Array.new(yMax);
+        while (i < yMax) {
+            let multiply32[i] = currMultiply;
+            let currMultiply = 32 + currMultiply;
+            let i = i + 1;
+        }
+        // Array of divides of 16
+        let i = 0; 
+        let divide16 = Array.new(xMax);
+        while (i < xMax) {
+            let divide16[i] = currDivide;
+            if (z = 15) {
+                let currDivide = currDivide + 1;
+                let z = -1;
+            }
+            let i = i + 1;
+            let z = z + 1;
+        }
+        // Array of power of 2 and array of 1's until the i'th spot
+        let powersOf2 = Array.new(16);
+        let i = 1;
+        let lowSeqPowersOf2 = Array.new(16);
+        let powersOf2[0] = 1;
+        let lowSeqPowersOf2[0] = powersOf2[0];
+        
+        while (i < 16) {
+            let powersOf2[i] = powersOf2[i-1] + powersOf2[i-1];
+            let lowSeqPowersOf2[i] = lowSeqPowersOf2[i-1] + powersOf2[i];
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /** Erases the entire screen. */
+    function void clearScreen() {
+        var int i;
+        while (i < screenRAMSize) {
+            do Memory.poke(screenBase + i, 0);
+            let i = i + 1;
+        }
+        return;
+    }   
+
+    /** Sets the current color, to be used for all subsequent drawXXX commands.
+     *  Black is represented by true, white by false. */
+    function void setColor(boolean b) {
+        let color = b;
+        return;
+    }
+
+    /** Draws the (x,y) pixel, using the current color. */
+    function void drawPixel(int x, int y) {
+        var int addr, val, moduloX;
+        let addr = (multiply32[y]) + (divide16[x]);
+        let val = Memory.peek(screenBase + addr);
+        let moduloX = x & 15;
+        do Screen.pokeMemory(addr, val, powersOf2[moduloX]);
+        return;
+    }
+
+    /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
+    function void drawLine(int x1, int y1, int x2, int y2) {
+        if (x1 = x2) {
+            do Screen.drawVertical(x1, Math.min(y1, y2), Math.abs(y2-y1));
+            return;}
+        if (y1 = y2) {
+            do Screen.drawHorizontal(Math.min(x1, x2), Math.max(x1, x2), y1);
+            return;}
+        if ((x1 < x2) & (y1 > y2)) {
+            do Screen.drawLineUpRight(x1, y1, x2-x1, y1-y2);
+            return;}
+        if ((x1 > x2) & (y1 < y2)) {
+            do Screen.drawLineUpRight(x2, y2, x1-x2, y2-y1);
+            return;}
+        if ((x1 > x2) & (y1 > y2)) {
+            do Screen.drawLineDownRight(x2, y2, x1-x2, y1-y2);
+            return;}
+        if ((x1 < x2) & (y1 < y2)) {
+            do Screen.drawLineDownRight(x1, y1, x2-x1, y2-y1);
+            return;}
+        return;
+    }
+
+    /** Draws a vertical line from y to y+dy in x col, using the current color. */
+    function void drawVertical(int x, int y, int dy) {
+        var int addr, val, moduloX, i;
+        let addr = (multiply32[y]) + (divide16[x]);
+        let moduloX = x & 15;
+        while (~(i > dy)) {
+            let val = Memory.peek(screenBase + addr);
+            do Screen.pokeMemory(addr, val, powersOf2[moduloX]);
+            let addr = addr + 32;
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /** Draws a horizontal line from x1 to x2 in y row, using the current color. */
+    function void drawHorizontal(int x1, int x2, int y) {
+        var int addr, val, i, block, temp, ramsCount, divX1, divX2, modX1, modX2;
+    
+        let block = multiply32[y];
+        let divX1 = divide16[x1];
+        let divX2 = divide16[x2];
+        let modX1 = x1 & 15;
+        let modX2 = x2 & 15;
+        let ramsCount = divX2 - divX1 + 1;
+        
+        let addr = block + divX1;
+        let val = Memory.peek(screenBase + addr);
+
+        // if there's one ram to handle
+        if (ramsCount = 1) {
+            let temp = ((~(lowSeqPowersOf2[modX1]) + powersOf2[modX1]) & (lowSeqPowersOf2[modX2]));
+            do Screen.pokeMemory(addr, val, temp);
+            return;
+        }
+        // if there's multiple rams to handle
+        // poke first ram 
+        do Screen.pokeMemory(addr, val, (~(lowSeqPowersOf2[modX1]) + powersOf2[modX1]));
+        let i = 1;
+        while (i < (ramsCount - 1)) {
+            if (color) {do Memory.poke(screenBase + addr + i, -1);}
+            else {do Memory.poke(screenBase + addr + i, 0);}
+            let i = i + 1;
+        }
+
+        // poke last ram
+        let addr = block + divX2;
+        let val = Memory.peek(screenBase + addr);
+        do Screen.pokeMemory(addr, val, lowSeqPowersOf2[modX2]);
+
+        return;
+    }
+
+    /** Draws a line in up-right direction, using the current color. */
+    function void drawLineUpRight(int x, int y, int dx, int dy) {
+        var int a, b, diff;
+        while (~(a > dx) & ~(b > dy)) {
+            do Screen.drawPixel(x + a, y - b);
+            if (diff < 0) {
+                let a = a + 1;
+                let diff = diff + dy;
+            }
+            else {
+                let b = b + 1;
+                let diff = diff - dx;
+            }
+        }
+        return;
+    }
+
+    /** Draws a line in down-right direction, using the current color. */
+    function void drawLineDownRight(int x, int y, int dx, int dy) {
+        var int a, b, diff;
+        // let b = dy;
+        while (~(a > dx) & ~(b > dy)) {
+            do Screen.drawPixel(x + a, y + b);
+            if (diff < 0) {
+                let b = b + 1;
+                let diff = diff + dx;
+            }
+            else {
+                let a = a + 1;
+                let diff = diff - dy;
+            }
+        }
+        return;
+    }
+
+    /** Draws a filled rectangle whose top left corner is (x1, y1)
+     * and bottom right corner is (x2,y2), using the current color. */
+    function void drawRectangle(int x1, int y1, int x2, int y2) {
+        var int i, dy;
+        let dy = y2 - y1;
+        while (i < (dy+1)) {
+            do Screen.drawHorizontal(x1, x2, (y1+i));
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
+    function void drawCircle(int x, int y, int r) {
+        var int dy, squareR, temp;
+        let dy = 1;
+        let squareR = r*r;
+        do Screen.drawHorizontal(x-r, x+r, y);
+        while (dy < (r+1)) {
+            let temp = Math.sqrt(squareR-(dy*dy));
+            do Screen.drawHorizontal(x-temp, x+temp, y+dy);
+            do Screen.drawHorizontal(x-temp, x+temp, y-dy);
+            let dy = dy + 1;
+        }
+        return;
+    }
+
+    /** Changing the value in the memory according the current color */
+    function void pokeMemory(int addr, int val, int temp) {
+        if (color) {do Memory.poke(screenBase + addr, val | temp);}
+        else {do Memory.poke(screenBase + addr, val & ~(temp));}
+        return;
+    }
+}

@@ -347,7 +347,7 @@ class CompilationEngine:
 
         elif token_type == 'SYMBOL':
             symbol = self.jack_tokenizer.symbol()
-            if symbol in {'-', "~"}:
+            if symbol in {'-', "~", "#", "^"}:
                 self.output_stream.write("<symbol> {0} </symbol>\n".format(symbol))
                 self.jack_tokenizer.advance()
                 self.compile_term()
@@ -388,7 +388,7 @@ class CompilationEngine:
         self.output_stream.write("<expression>\n")
         self.compile_term()
         while self.jack_tokenizer.token_type() == "SYMBOL" and self.jack_tokenizer.symbol() in {
-            "+", "-", "*", "/", "&amp;", "|", "&gt;", "&lt;", "=", "<<", ">>"}:
+            "+", "-", "*", "/", "&amp;", "|", "&gt;", "&lt;", "="}:
             self.output_stream.write("<symbol> {0} </symbol>\n".format(
                 self.jack_tokenizer.symbol()))
             self.jack_tokenizer.advance()
