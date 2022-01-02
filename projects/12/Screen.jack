@@ -179,7 +179,6 @@ class Screen {
     /** Draws a line in down-right direction, using the current color. */
     function void drawLineDownRight(int x, int y, int dx, int dy) {
         var int a, b, diff;
-        // let b = dy;
         while (~(a > dx) & ~(b > dy)) {
             do Screen.drawPixel(x + a, y + b);
             if (diff < 0) {

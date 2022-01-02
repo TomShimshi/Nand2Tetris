@@ -112,6 +112,7 @@ class Keyboard {
             }
         }
         let val = str.intValue();
+        do str.dispose();
         return val;
     }
 }

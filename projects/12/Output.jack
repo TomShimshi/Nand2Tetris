@@ -203,14 +203,13 @@ class Output {
             let i = 0;
             let j = 0;
         }
-        // let charMap = Output.getMap(32); // print white box
-        // do Output.drawBlock(charMap);
 
         let cursorRow = i;
         let cursorCol = j;
 
         let charMap = Output.getMap(32); // print white box
         do Output.drawBlock(charMap);
+
         return;
     }
 
@@ -252,6 +251,7 @@ class Output {
         do s.setInt(i);
         do Output.printString(s);
 
+        do s.dispose();
         return;
     }
 
